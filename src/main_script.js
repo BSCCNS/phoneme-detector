@@ -1,3 +1,5 @@
+const resultArray = [];
+
 // BASIC OBJECT FOR VOCAL TRACT
 const constrictions = {
   getData() {
@@ -164,6 +166,17 @@ predictButton.addEventListener("click", (event) => {
   predictButton.innerText = predictFlag ? "stop predicting" : "predict";
 });
 
+const printButton = document.getElementById("print");
+printButton.addEventListener("click", (event) => {
+  var data = {test: resultArray};
+  var json = JSON.stringify(data);
+  var blob = new Blob([json], {type: 'application/json'});
+  var link = document.createElement('a');
+  link.href = window.URL.createObjectURL(blob);
+  link.download = 'datos.json';
+  link.click();
+});
+
 /* // esto no sirve por ahora porque no uso el local storage
 function addClassification() {
   const inputs = [];
@@ -249,6 +262,14 @@ async function predict(spectrum) {
   metrics = metrics + "tongue_i: " + message["tongue.index"].toFixed(5) + "\n";
   metrics = metrics + "Intensity: " + message.intensity.toFixed(5) + "\n";
   metrics = metrics + "Voiceness: " + message.voiceness.toFixed(5);
+
+  resultArray.push({
+    backD: message["backConstriction.diameter"],
+    backI: message["backConstriction.index"],
+    timesTamp: Date.now(),
+    phoneme: label,
+    confidences: confidencesByLabel
+  });
 
   // Aqui cambiamos los divs
   topPredictionSpan.innerText = label; // fonema predicho
