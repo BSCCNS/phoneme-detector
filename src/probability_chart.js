@@ -17,7 +17,7 @@ function setup() {
   phonemeLetters = [];
   gap = 0;
   yheight = HEIGHT - 2 * margin;
-  let font = loadFont("/Slack-Light.ttf");
+  let font = loadFont("/fonts/Slack-Light.ttf");
   textFont("Poppins");
   textAlign(CENTER);
 }
