@@ -1,4 +1,6 @@
 const resultArray = [];
+const ALLPHONEMES = true;
+const VALIDATION_ACTIVE = true;
 
 // BASIC OBJECT FOR VOCAL TRACT
 const constrictions = {
@@ -168,12 +170,12 @@ predictButton.addEventListener("click", (event) => {
 
 const printButton = document.getElementById("print");
 printButton.addEventListener("click", (event) => {
-  var data = {test: resultArray};
+  var data = { test: resultArray };
   var json = JSON.stringify(data);
-  var blob = new Blob([json], {type: 'application/json'});
-  var link = document.createElement('a');
+  var blob = new Blob([json], { type: "application/json" });
+  var link = document.createElement("a");
   link.href = window.URL.createObjectURL(blob);
-  link.download = 'datos.json';
+  link.download = "datos.json";
   link.click();
 });
 
@@ -213,6 +215,11 @@ trainButton.addEventListener("click", (event) => {
       predictButton.disabled = false;
       trainButton.innerText = "train";
       trainButton.disabled = false;
+      for (let c = 0; c < classifications.length; c++) {
+        let fon = classifications[c].name;
+        phonemeLetters.push(fon);
+        averageProb[fon] = [0, 0, 0, 0, 0, 0];
+      }
     }, 1);
   }
 });
@@ -268,7 +275,7 @@ async function predict(spectrum) {
     backI: message["backConstriction.index"],
     timesTamp: Date.now(),
     phoneme: label,
-    confidences: confidencesByLabel
+    confidences: confidencesByLabel,
   });
 
   // Aqui cambiamos los divs
@@ -291,14 +298,14 @@ async function predict(spectrum) {
     spectrumCanvas,
     spectrumContext
   );
-  // Guardamos las predicciones ESTO SOLO ES PARA MEDIR COMO FUNCIONA
-  /*
-  all_predictions.push({
-    spectrum: spectrum,
-    confidences: confidences,
-    phonemes: classifications.map((x) => x.name),
-  });
-  */
+  // Guardamos las predicciones ESTO SOLO ES PARA VALIDAR COMO FUNCIONA
+  if (VALIDATION_ACTIVE) {
+    all_predictions.push({
+      spectrum: spectrum,
+      confidences: confidences,
+      phonemes: classifications.map((x) => x.name),
+    });
+  }
 }
 const predictThrottled = throttle(predict, 20); //ms of prediction time
 
@@ -368,7 +375,7 @@ const throttledSendToGame = throttle(() => {
   }
 }, 5);
 
-// ESTO ES PARA PREPARAR EL CLASSIFICADOS
+// ESTO ES PARA PREPARAR EL CLASSIFICADOR
 let classifications = [];
 function appendClassification({ inputs, outputs, name }) {
   const classification = {
@@ -400,7 +407,7 @@ function normalizeArray(array) {
 //document.body.addEventListener("click", (e) => {
 //  deselect();
 //});
-
+/*
 function refreshLocalstorage() {
   localStorage.clear();
   classifications.forEach((classification, index) => {
@@ -409,6 +416,7 @@ function refreshLocalstorage() {
     localStorage[index] = JSON.stringify({ inputs, outputs, name });
   });
 }
+*/
 
 // EL BOTON PARA SUBIR CLASIFICACIONES
 const uploadClassificationsInput = document.getElementById(
@@ -424,7 +432,7 @@ function uploadClassifications(event) {
   const onLoadedJSONS = () => {
     loadJSON(...jsons);
   };
-  localStorage.clear();
+  //localStorage.clear();
 
   const readNextFile = (index = 0) => {
     const file = files[index];
@@ -456,11 +464,11 @@ const loadJSON = (...jsons) => {
     classifications.forEach((classification) => {
       if (
         // TODO ESTE IF SACAR EL true || PARA PONER SOLO ALGUNOS FONEMAS
-        true ||
+        ALLPHONEMES ||
         ["a", "e", "i", "o", "u", "m", "n", "ch"].includes(classification.name)
       ) {
         appendClassification(classification);
-        localStorage[localStorage.length] = JSON.stringify(classification);
+        //localStorage[localStorage.length] = JSON.stringify(classification);
       }
     });
   });
@@ -511,7 +519,7 @@ document.addEventListener("keydown", (event) => {
       } else {
         toContainer.parentNode.insertBefore(toContainer, fromContainer);
       }
-      refreshLocalstorage();
+      //refreshLocalstorage();
     }
   }
 });
@@ -531,20 +539,10 @@ thresh.forEach((element) => {
 });
 
 /// ESTO ES ONLY for validation, NOT IMPORTANT FOR PRODUCTION
-/*
-let validationResults = [];
-async function predictOffline(spectrum, k, phon) {
-  results = await classifier.classify(
-    shouldNormalize ? normalizeArray(spectrum) : spectrum,
-    k
-  );
-  const { classIndex, label, confidencesByLabel, confidences } = results;
-  validationResults.push({
-    phoneme: phon,
-    k: k,
-    prediction: confidencesByLabel,
-  });
-}
+
+// ESTO ES PARA PREPARAR LA VALIDACION
+
+let validations = [];
 
 const uploadValidationsInput = document.getElementById("uploadValidation");
 uploadValidationsInput.addEventListener("input", (event) =>
@@ -555,7 +553,7 @@ function uploadValidations(event) {
 
   const jsons = [];
   const onLoadedJSONS = () => {
-    validateJSON(...jsons);
+    organizeValidationJSONs(...jsons);
   };
 
   const readNextFile = (index = 0) => {
@@ -574,17 +572,53 @@ function uploadValidations(event) {
   readNextFile();
 }
 
-const validateJSON = (...jsons) => {
-  jsons.forEach((validations) => {
-    validations.forEach((phoneme) => {
+const organizeValidationJSONs = (...jsons) => {
+  jsons.forEach((jsonFile) => {
+    jsonFile.forEach((phoneme) => {
       phoneme.inputs.forEach((spectrum) => {
-        console.log("Validating", phoneme.name);
-        for (let k = 2; k <= phonemeLetters.length; k++) {
-          console.log(k);
-          predictOffline(spectrum, k, phoneme.name);
-        }
+        const validation = {
+          spectrum: spectrum,
+          name: phoneme.name,
+        };
+        validations.push(validation);
       });
     });
   });
+  validateButton.disabled = false;
 };
-*/
+
+// do the validation
+
+let validationResults = [];
+
+const validateButton = document.getElementById("validate");
+validateButton.addEventListener("click", (event) => {
+  if (validations.length > 0) {
+    validateButton.innerText = "validating...";
+    validateButton.disabled = true;
+    setTimeout(() => {
+      validationResults = [];
+      validations.forEach((validation) => {
+        for (let k = 2; k <= phonemeLetters.length; k++) {
+          predictOffline(validation.spectrum, k, validation.name);
+          console.log(k);
+        }
+      });
+      validateButton.innerText = "validate";
+      validateButton.disabled = false;
+    }, 1);
+  }
+});
+
+async function predictOffline(spectrum, k, phon) {
+  results = await classifier.classify(
+    shouldNormalize ? normalizeArray(spectrum) : spectrum,
+    k
+  );
+  const { classIndex, label, confidencesByLabel, confidences } = results;
+  validationResults.push({
+    phoneme: phon,
+    k: k,
+    prediction: confidencesByLabel,
+  });
+}
