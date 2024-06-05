@@ -1,5 +1,5 @@
 const resultArray = [];
-const ALLPHONEMES = true;
+const PHONEMES = true; // ["a", "e", "i", "o", "u", "m", "n", "ch"] // for testing
 const VALIDATION_ACTIVE = true;
 
 // BASIC OBJECT FOR VOCAL TRACT
@@ -464,8 +464,8 @@ const loadJSON = (...jsons) => {
     classifications.forEach((classification) => {
       if (
         // TODO ESTE IF SACAR EL true || PARA PONER SOLO ALGUNOS FONEMAS
-        ALLPHONEMES ||
-        ["a", "e", "i", "o", "u", "m", "n", "ch"].includes(classification.name)
+        PHONEMES === true ||
+        PHONEMES.includes(classification.name)
       ) {
         appendClassification(classification);
         //localStorage[localStorage.length] = JSON.stringify(classification);
