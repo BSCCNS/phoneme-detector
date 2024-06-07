@@ -287,6 +287,8 @@ async function predict(spectrum) {
   resultArray.push({
     backD: message["backConstriction.diameter"],
     backI: message["backConstriction.index"],
+    intensity: message.intensity,
+    voiceness: message.voiceness,
     timesTamp: Date.now(),
     phoneme: avgLabel,
     confidences: confidencesByLabel,
