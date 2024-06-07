@@ -4,8 +4,8 @@ let gap;
 let yheight;
 let WIDTH = 800,
   HEIGHT = 300;
-let phonemeLetters;
-let averageProb;
+let phonemeLetters = [];
+let averageProb = [];
 
 let font,
   fontsize = 32;
@@ -29,11 +29,12 @@ function draw() {
   let y = margin;
   let pY = 0;
   let p = 0;
+  gap = (WIDTH - 2 * margin) / classifications.length;
   //beginShape();
   //strokeWeight(2);
   //vertex(margin - gap / 2, margin);
   if (results) {
-    if (phonemeLetters.length == 0) {
+    if (phonemeLetters.length == 0 && false) {
       phonemeLetters = [];
       averageProb = {};
       for (let c = 0; c < classifications.length; c++) {
@@ -48,12 +49,12 @@ function draw() {
     let c = 1;
     for (var foneme in results.confidencesByLabel) {
       p = results.confidencesByLabel[foneme];
-      averageProb[foneme].shift();
-      averageProb[foneme].push(p);
+      //averageProb[foneme].shift();
+      //averageProb[foneme].push(p);
 
-      pY =
-        (averageProb[foneme].reduce((a, b) => a + b, 0) * yheight) /
-        averageProb[foneme].length; //p*yheight+margin;
+      pY = p * yheight;
+      //        (averageProb[foneme].reduce((a, b) => a + b, 0) * yheight) /
+      //      averageProb[foneme].length; //p*yheight+margin;
       //console.log(pY);
       stroke(0xff);
       strokeWeight(2);

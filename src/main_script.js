@@ -1,6 +1,9 @@
 const resultArray = [];
-const PHONEMES = true; // ["a", "e", "i", "o", "u", "m", "n", "ch"] // for testing
+const PHONEMES = true; // for testing "m", "n", "ch" ["a", "e", "i", "o", "u"];
 const VALIDATION_ACTIVE = true;
+
+let lastNProbabilities = {};
+let numberOfStepsToAverage = 5;
 
 // BASIC OBJECT FOR VOCAL TRACT
 const constrictions = {
@@ -215,11 +218,6 @@ trainButton.addEventListener("click", (event) => {
       predictButton.disabled = false;
       trainButton.innerText = "train";
       trainButton.disabled = false;
-      for (let c = 0; c < classifications.length; c++) {
-        let fon = classifications[c].name;
-        phonemeLetters.push(fon);
-        averageProb[fon] = [0, 0, 0, 0, 0, 0];
-      }
     }, 1);
   }
 });
@@ -234,9 +232,25 @@ async function predict(spectrum) {
   let message;
   // Clasificamos el sonido
   results = await classifier.classify(
-    shouldNormalize ? normalizeArray(spectrum) : spectrum
+    shouldNormalize ? normalizeArray(spectrum) : spectrum,
+    phonemeLetters.length - 1
   );
   const { classIndex, label, confidencesByLabel, confidences } = results;
+
+  // Smooth out the probabilities !!!
+  phonemeLetters.forEach((foneme) => {
+    lastNProbabilities[foneme].shift();
+    lastNProbabilities[foneme].push(confidencesByLabel[foneme]);
+    confidencesByLabel[foneme] =
+      lastNProbabilities[foneme].reduce((a, b) => a + b, 0) /
+      numberOfStepsToAverage;
+  });
+  // recompute label with smoothed out probabilities
+  let avgLabel = Object.keys(confidencesByLabel).reduce((a, b) =>
+    confidencesByLabel[a] > confidencesByLabel[b] ? a : b
+  );
+  console.log(confidencesByLabel);
+  //avgLabel = label;
   sortedClassifications = classifications.toSorted(
     (a, b) => confidences[b.index] - confidences[a.index]
   );
@@ -274,18 +288,18 @@ async function predict(spectrum) {
     backD: message["backConstriction.diameter"],
     backI: message["backConstriction.index"],
     timesTamp: Date.now(),
-    phoneme: label,
+    phoneme: avgLabel,
     confidences: confidencesByLabel,
   });
 
   // Aqui cambiamos los divs
-  topPredictionSpan.innerText = label; // fonema predicho
+  topPredictionSpan.innerText = avgLabel; // fonema predicho
   outputSpan.innerText = metrics; // datos de las posiciones de la garganta
   if (habladoSpan.innerText.length > 30) {
     // imprimimos los ultimos fonemas predichos
     habladoSpan.innerText = habladoSpan.innerText.slice(1, 30);
   }
-  habladoSpan.innerText = habladoSpan.innerText + label;
+  habladoSpan.innerText = habladoSpan.innerText + avgLabel;
 
   if (message) {
     throttledSendToPinkTrombone(message);
@@ -448,17 +462,10 @@ function uploadClassifications(event) {
     }
   };
   readNextFile();
-
-  phonemeLetters = [];
-  averageProb = {};
-  for (let c = 0; c < classifications.length; c++) {
-    let fon = classifications[c].name;
-    phonemeLetters.push(fon);
-    averageProb[fon] = [0, 0, 0, 0, 0, 0];
-  }
 }
 
 const loadJSON = (...jsons) => {
+  phonemeLetters = [];
   jsons.forEach((classifications) => {
     console.log(classifications);
     classifications.forEach((classification) => {
@@ -468,6 +475,11 @@ const loadJSON = (...jsons) => {
         PHONEMES.includes(classification.name)
       ) {
         appendClassification(classification);
+        lastNProbabilities[classification.name] = Array.from(
+          { length: numberOfStepsToAverage },
+          (_, i) => 0
+        );
+        phonemeLetters.push(classification.name);
         //localStorage[localStorage.length] = JSON.stringify(classification);
       }
     });
@@ -596,17 +608,15 @@ validateButton.addEventListener("click", (event) => {
   if (validations.length > 0) {
     validateButton.innerText = "validating...";
     validateButton.disabled = true;
-    setTimeout(() => {
-      validationResults = [];
-      validations.forEach((validation) => {
-        for (let k = 2; k <= phonemeLetters.length; k++) {
-          predictOffline(validation.spectrum, k, validation.name);
-          console.log(k);
-        }
-      });
-      validateButton.innerText = "validate";
-      validateButton.disabled = false;
-    }, 1);
+    validationResults = [];
+    validations.forEach((validation) => {
+      console.log(validation.name);
+      for (let k = 2; k <= phonemeLetters.length; k++) {
+        throttle(predictOffline(validation.spectrum, k, validation.name), 20);
+      }
+    });
+    validateButton.innerText = "validate";
+    validateButton.disabled = false;
   }
 });
 
@@ -615,10 +625,10 @@ async function predictOffline(spectrum, k, phon) {
     shouldNormalize ? normalizeArray(spectrum) : spectrum,
     k
   );
-  const { classIndex, label, confidencesByLabel, confidences } = results;
+  //const { classIndex, label, confidencesByLabel, confidences } = results;
   validationResults.push({
     phoneme: phon,
     k: k,
-    prediction: confidencesByLabel,
+    prediction: results.confidencesByLabel,
   });
 }
