@@ -4,6 +4,7 @@ const VALIDATION_ACTIVE = true;
 
 let lastNProbabilities = {};
 let numberOfStepsToAverage = 5;
+let recordData = false;
 
 // BASIC OBJECT FOR VOCAL TRACT
 const constrictions = {
@@ -171,7 +172,8 @@ predictButton.addEventListener("click", (event) => {
   predictButton.innerText = predictFlag ? "stop predicting" : "predict";
 });
 
-const printButton = document.getElementById("print");
+let printButton = document.getElementById("print");
+printButton.disabled = true;
 printButton.addEventListener("click", (event) => {
   var data = { test: resultArray };
   var json = JSON.stringify(data);
@@ -180,6 +182,15 @@ printButton.addEventListener("click", (event) => {
   link.href = window.URL.createObjectURL(blob);
   link.download = "datos.json";
   link.click();
+  printButton.disabled = true;
+  recordButton.disabled = false;
+});
+
+const recordButton = document.getElementById("record");
+recordButton.addEventListener("click", (event) => {
+  printButton.disabled = false;
+  recordButton.disabled = true;
+  recordData = true;
 });
 
 /* // esto no sirve por ahora porque no uso el local storage
@@ -284,15 +295,17 @@ async function predict(spectrum) {
   metrics = metrics + "Intensity: " + message.intensity.toFixed(5) + "\n";
   metrics = metrics + "Voiceness: " + message.voiceness.toFixed(5);
 
-  resultArray.push({
-    backD: message["backConstriction.diameter"],
-    backI: message["backConstriction.index"],
-    intensity: message.intensity,
-    voiceness: message.voiceness,
-    timesTamp: Date.now(),
-    phoneme: avgLabel,
-    confidences: confidencesByLabel,
-  });
+  if (recordData) {
+    resultArray.push({
+      backD: message["backConstriction.diameter"],
+      backI: message["backConstriction.index"],
+      intensity: message.intensity,
+      voiceness: message.voiceness,
+      timesTamp: Date.now(),
+      phoneme: avgLabel,
+      confidences: confidencesByLabel,
+    });
+  }
 
   // Aqui cambiamos los divs
   topPredictionSpan.innerText = avgLabel; // fonema predicho
