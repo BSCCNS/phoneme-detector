@@ -1,108 +1,90 @@
-<html>
-  <head>
-    <title>Phoneme Detector</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Aldrich&family=Barlow:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;1,100;1,200;1,300;1,400;1,500;1,600;1,700&family=Comfortaa:wght@300&family=Dosis:wght@200;300;400&family=Londrina+Solid:wght@100;300;400&family=Passion+One&family=Poiret+One&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
-      rel="stylesheet"
-    />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/p5.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.3/addons/p5.sound.min.js"></script>
-    <meta charset="utf-8" />
-  </head>
-  <style>
-    #OUTPUT {
-      position: fixed;
-      top: 110px;
-      right: 10px;
-      font-size: 24px;
+<div>Teachable Machine Audio Model</div>
+<button type="button" onclick="init()">Start</button>
+<br /><br />
+<span id="hablado"></span>
+<br /><br />
+<div id="label-container"></div>
+
+<script src="/src/ext/tf.min.js"></script>
+<script src="/src/ext/speech-commands.min.js"></script>
+
+<script type="text/javascript">
+  // more documentation available at
+  // https://github.com/tensorflow/tfjs-models/tree/master/speech-commands
+
+  const VOLUME_THRESHOLD = 0.5; // TODO
+  const PROB_THRESHOLD = 0.75;
+  const OVERLAP_FACTOR = 0.9; // probably want between 0.5 and 0.75, amount of overlap between samples
+
+  // the link to  model provided by Teachable Machine export panel
+  const URL = "http://127.0.0.1:8000/models/";
+  //"https://teachablemachine.withgoogle.com/models/T-0mi0cUd/"; // 2 voces 100 Epochs
+
+  async function createModel() {
+    const checkpointURL = URL + "model.json"; // model topology
+    const metadataURL = URL + "metadata.json"; // model metadata
+
+    console.log("Starting engine");
+
+    const recognizer = speechCommands.create(
+      "BROWSER_FFT", // fourier transform type, not useful to change
+      undefined, // speech commands vocabulary feature, not useful for your models
+      checkpointURL,
+      metadataURL
+    );
+
+    // check that model and metadata are loaded via HTTPS requests.
+    await recognizer.ensureModelLoaded();
+
+    return recognizer;
+  }
+
+  async function init() {
+    const recognizer = await createModel();
+    const classLabels = recognizer.wordLabels(); // get class labels
+    const labelContainer = document.getElementById("label-container");
+    const habladoSpan = document.getElementById("hablado");
+
+    for (let i = 0; i < classLabels.length; i++) {
+      labelContainer.appendChild(document.createElement("div"));
     }
-    #topPrediction {
-      font-weight: bold;
-      position: fixed;
-      top: 10px;
-      right: 10px;
-      font-size: 100px;
-    }
-    #hablado {
-      font-weight: bold;
-      position: fixed;
-      top: 350px;
-      right: 10px;
-      font-size: 24px;
-    }
-    canvas {
-      display: block;
-    }
-    html,
-    body {
-      margin: 0;
-      padding: 0;
-    }
-  </style>
 
-  <body>
-    <span id="topPrediction"></span>
-    <span id="OUTPUT"></span>
-    <span id="hablado"></span>
+    // listen() takes two arguments:
+    // 1. A callback function that is invoked anytime a word is recognized.
+    // 2. A configuration object with adjustable fields
+    recognizer.listen(
+      (result) => {
+        const scores = result.scores; // probability of prediction for each class
+        // render the probability scores per class
+        let maxLabel,
+          maxProb = 0;
 
-    <button id="toggleMicrophone" disabled>enable microphone</button>
-    <br />
-    <main></main>
-    <script src="/src/probability_chart.js"></script>
+        for (let i = 0; i < classLabels.length; i++) {
+          const classPrediction =
+            classLabels[i] + ": " + result.scores[i].toFixed(2);
+          labelContainer.childNodes[i].innerHTML = classPrediction;
+          if (result.scores[i] > maxProb) {
+            maxProb = result.scores[i];
+            maxLabel = i;
+          }
+        }
+        if (true || maxProb > PROB_THRESHOLD) {
+          if (habladoSpan.innerText.length > 30) {
+            // imprimimos los ultimos fonemas predichos
+            habladoSpan.innerText = habladoSpan.innerText.slice(1, 30);
+          }
+          habladoSpan.innerText = habladoSpan.innerText + classLabels[maxLabel];
+        }
+      },
+      {
+        includeSpectrogram: false, // in case listen should return result.spectrogram
+        probabilityThreshold: PROB_THRESHOLD,
+        invokeCallbackOnNoiseAndUnknown: false,
+        overlapFactor: OVERLAP_FACTOR, // probably want between 0.5 and 0.75. More info in README
+      }
+    );
 
-    <canvas width="500" height="200" id="spectrum"></canvas>
-    <br />
-
-    <button id="train" disabled>train</button>
-    <button id="predict" disabled>predict</button>
-
-    <label
-      >upload data
-      <input type="file" accept="application/JSON" id="uploadClassifications"
-    /></label>
-    <br />
-    <!--    THIS IS USED TO GENERATE VALIDATIONS, NOT IMPORTANT IN GENERAL-->
-    <label
-      >upload validation
-      <input type="file" accept="application/JSON" id="uploadValidation"
-    /></label>
-    <button id="validate">validate</button>
-    <!-- -->
-    <br />
-    <button id="record">start recording</button>
-    <button id="print">print</button>
-    <br />
-    <label
-      >Volume threshold
-      <input
-        step="0.005"
-        type="number"
-        class="threshold"
-        min="0"
-        max="1"
-        value="0.02"
-    /></label>
-    <label>
-      <input
-        step="0.005"
-        type="range"
-        class="threshold"
-        min="0"
-        max="1"
-        value="0.02"
-      />
-    </label>
-    <br />
-  </body>
-  <script src="/src/ext/ml5.min.js"></script>
-  <script src="/src/ext/utils.js"></script>
-
-  <script src="/src/main_script.js"></script>
-
-  <script src="/src/ext/essentia.js"></script>
-  <script src="/src/ext/ringbuf.js"></script>
-  <script src="/src/ext/meyda.min.js"></script>
-  <script src="/src/ext/meyda.js"></script>
-</html>
+    // Stop the recognition in 5 seconds.
+    // setTimeout(() => recognizer.stopListening(), 5000);
+  }
+</script>

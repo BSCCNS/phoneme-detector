@@ -1,5 +1,6 @@
 const resultArray = [];
 const PHONEMES = true; // for testing "m", "n", "ch" ["a", "e", "i", "o", "u"];
+//  ['a', 'e', 'i', 'o', 'u', 'p', 'm', 'θ', 'l', 'r', 'ch', 'b', 'n', 'd', 'k', 's', 'ñ']
 const VALIDATION_ACTIVE = true;
 
 let lastNProbabilities = {};
