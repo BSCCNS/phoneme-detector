@@ -15,6 +15,11 @@
   const VOLUME_THRESHOLD = 0.5; // TODO
   const PROB_THRESHOLD = 0.75;
   const OVERLAP_FACTOR = 0.9; // probably want between 0.5 and 0.75, amount of overlap between samples
+  const MINVOLUME = 80,
+    MAXVOLUME = 17.5;
+  const intclamp = (val) =>
+    (Math.min(Math.max(val, -MINVOLUME), -MAXVOLUME) + MINVOLUME) /
+    (MINVOLUME - MAXVOLUME);
 
   // the link to  model provided by Teachable Machine export panel
   const URL = "http://127.0.0.1:8000/models/";
@@ -65,26 +70,35 @@
           labelContainer.childNodes[i].innerHTML = classPrediction;
           if (result.scores[i] > maxProb) {
             maxProb = result.scores[i];
-            maxLabel = i;
+            maxLabel = classLabels[i];
           }
         }
-        if (true || maxProb > PROB_THRESHOLD) {
+        if (maxProb > PROB_THRESHOLD) {
           if (habladoSpan.innerText.length > 30) {
             // imprimimos los ultimos fonemas predichos
             habladoSpan.innerText = habladoSpan.innerText.slice(1, 30);
           }
-          habladoSpan.innerText = habladoSpan.innerText + classLabels[maxLabel];
+          habladoSpan.innerText = habladoSpan.innerText + maxLabel;
         }
+
+        // Compute intensity
+        const amplitudes = result.spectrogram.data.map(Math.exp);
+        let total_intensity = amplitudes.reduce((accumulator, currentValue) => {
+          return accumulator + currentValue;
+        }, 0);
+        total_intensity =
+          total_intensity > 0 ? Math.log(total_intensity) : -MINVOLUME;
+        let loudness = intclamp(total_intensity);
+        let tenseness = Math.pow(loudness, 4);
+        let voiceness = (Math.acos(1 - tenseness) * 2) / Math.PI;
+        console.log(loudness, tenseness, voiceness);
       },
       {
-        includeSpectrogram: false, // in case listen should return result.spectrogram
+        includeSpectrogram: true, // in case listen should return result.spectrogram
         probabilityThreshold: PROB_THRESHOLD,
         invokeCallbackOnNoiseAndUnknown: false,
         overlapFactor: OVERLAP_FACTOR, // probably want between 0.5 and 0.75. More info in README
       }
     );
-
-    // Stop the recognition in 5 seconds.
-    // setTimeout(() => recognizer.stopListening(), 5000);
   }
 </script>
